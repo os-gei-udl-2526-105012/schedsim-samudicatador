@@ -135,7 +135,60 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
         time++;
     }
 
+  
+    Process* current_process = NULL;
+    int next_arrival = 0;
+
+ 
+    for (int t = 0; t < duration; t++) {
+        
+        // Afegim els processos que arriben en aquest instant a la cua
+        while (next_arrival < nprocs && procTable[next_arrival].arrive_time == t) {
+            enqueue(&procTable[next_arrival]);
+            next_arrival++;
+        }
+
+        // Si no hi ha procés executant-se, treiem un de la cua
+        if (current_process == NULL || current_process->completed) {
+            current_process = dequeue();
+        }
+
+        // Executem el procés actual segons l'algoritme
+        if (algorithm == FCFS) {
+            if (current_process != NULL) {
+
+                current_process->lifecycle[t] = Running;
+                
+                int burst_consumed = getCurrentBurst(current_process, t + 1);
+                
+                if (burst_consumed == 1) {
+                    current_process->response_time = t - current_process->arrive_time;
+                }
+                
+                // Si ha acabat el seu burst, marcar com completat
+                if (burst_consumed >= current_process->burst) {
+                    current_process->lifecycle[t+1] = Finished;
+                    current_process->completed = true;
+                    current_process->return_time = t + 1 - current_process->arrive_time;
+                }
+            }
+        }
+
+        // Marquem els processos que estan esperant com Bloqued
+        for (int p = 0; p < nprocs; p++) {
+            if (procTable[p].arrive_time <= t && !procTable[p].completed && 
+                &procTable[p] != current_process) {
+                procTable[p].lifecycle[t] = Bloqued;
+                procTable[p].waiting_time++;
+            }
+        }
+
+    }
+
     printSimulation(nprocs,procTable,duration);
+
+
+    //print metrix
 
     for (int p=0; p<nprocs; p++ ){
         destroyProcess(procTable[p]);
