@@ -86,55 +86,6 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
         procTable[p].response_time = 0;
         procTable[p].completed = false;
     }
-    int time = 0;
-    int completed = 0;
-    Process *current = NULL;
-
-    while (completed < nprocs) {
-
-        for (int p = 0; p < nprocs; p++) {
-            if (procTable[p].arrive_time == time) {
-                enqueue(&procTable[p]);
-            }
-        }
-
-        if (current == NULL) {
-            current = dequeue();
-
-            if (current != NULL && current->response_time == 0) {
-                current->response_time = time - current->arrive_time;
-            }
-        }
-
-        for (int p = 0; p < nprocs; p++) {
-            if (&procTable[p] == current) {
-                procTable[p].lifecycle[time] = Running;
-            }
-            else if (procTable[p].completed) {
-                procTable[p].lifecycle[time] = Finished;
-            }
-            else if (procTable[p].arrive_time <= time) {
-                procTable[p].lifecycle[time] = Bloqued;
-            }
-            else {
-                procTable[p].lifecycle[time] = -1; 
-            }
-        }
-
-        if (current != NULL) {
-            int burstUsed = getCurrentBurst(current, time + 1);
-
-            if (burstUsed == current->burst) {
-                current->completed = true;
-                current->return_time = time - current->arrive_time + 1;
-                completed++;
-                current = NULL; 
-            }
-        }
-
-        time++;
-    }
-
   
     Process* current_process = NULL;
     int next_arrival = 0;
