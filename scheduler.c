@@ -69,7 +69,7 @@ int getCurrentBurst(Process* proc, int current_time){
 
 int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modality, int quantum){
 
-    //Process * _proclist;
+    Process * _proclist;
 
     qsort(procTable,nprocs,sizeof(Process),compareArrival);
 
