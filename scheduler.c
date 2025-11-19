@@ -94,7 +94,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
  
     for (int t = 0; t < duration; t++) {
         
-        // Afegir processos que arriben en aquest instant a la cua
+        // Afegim els processos que arriben en aquest instant a la cua
         while (next_arrival < nprocs && procTable[next_arrival].arrive_time == t) {
             enqueue(&procTable[next_arrival]);
             next_arrival++;
@@ -108,13 +108,11 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
         // Executem el procés actual segons l'algoritme
         if (algorithm == FCFS) {
             if (current_process != NULL) {
-                // Marcar com Running
+
                 current_process->lifecycle[t] = Running;
                 
-                // Calcular temps de CPU consumit fins ara
                 int burst_consumed = getCurrentBurst(current_process, t + 1);
                 
-                // Si és la primera vegada que s'executa, guardar response_time
                 if (burst_consumed == 1) {
                     current_process->response_time = t - current_process->arrive_time;
                 }
@@ -128,11 +126,11 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
             }
         }
 
-        // Marquem els processos que estan esperant com Ready
+        // Marquem els processos que estan esperant com Bloqued
         for (int p = 0; p < nprocs; p++) {
             if (procTable[p].arrive_time <= t && !procTable[p].completed && 
                 &procTable[p] != current_process) {
-                procTable[p].lifecycle[t] = Ready;
+                procTable[p].lifecycle[t] = Bloqued;
                 procTable[p].waiting_time++;
             }
         }
@@ -173,7 +171,6 @@ void printSimulation(size_t nprocs, Process *procTable, size_t duration){
             printf ("|%4s", current.name);
             for(int t=0; t<duration; t++){
                 printf("|%2s",  (current.lifecycle[t]==Running ? "E" : 
-                        current.lifecycle[t]==Ready ? "B" :
                         current.lifecycle[t]==Bloqued ? "B" :   
                         current.lifecycle[t]==Finished ? "F" : " "));
             }
