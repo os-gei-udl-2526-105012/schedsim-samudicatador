@@ -25,5 +25,7 @@ void printMetrics(size_t simulationCPUTime, size_t nprocs, Process *procTable );
 void printSimulation(size_t nprocs, Process *procTable, size_t duration);
 int getCurrentBurst(Process* proc, int current_time);
 size_t getTotalCPU(Process *procTable, size_t nprocs);
+int getRemainingBurst(Process* proc, int current_time);
+
 
 #endif

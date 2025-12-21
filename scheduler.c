@@ -6,8 +6,6 @@
 #include "queue.h"
 #include "scheduler.h"
 
-int getRemainingBurst(Process* proc, int current_time);
-
 int num_algorithms() {
   return sizeof(algorithmsNames) / sizeof(char *);
 }
