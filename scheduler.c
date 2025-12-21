@@ -6,6 +6,8 @@
 #include "queue.h"
 #include "scheduler.h"
 
+int getRemainingBurst(Process* proc, int current_time);
+
 int num_algorithms() {
   return sizeof(algorithmsNames) / sizeof(char *);
 }
@@ -73,8 +75,6 @@ int getRemainingBurst(Process* proc, int current_time) {
 }
 
 int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modality, int quantum){
-
-    Process * _proclist;
 
     qsort(procTable,nprocs,sizeof(Process),compareArrival);
 
