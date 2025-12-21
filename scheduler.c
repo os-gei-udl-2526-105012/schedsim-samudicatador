@@ -115,22 +115,19 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
             }
 
             // Per SJF (non-preemptive), ordenar la cua per burst abans de treure el procés
-            if (algorithm == SJF && modality == NONPREEMPTIVE && get_queue_size() > 0) {
+            if (algorithm == SJF && get_queue_size() > 0) {
                 Process* list = transformQueueToList();
                 size_t queue_size = get_queue_size();
-                
-                // Ordenar per burst (shortest first)
                 qsort(list, queue_size, sizeof(Process), compareBurst);
-                
                 setQueueFromList(list);
                 free(list);
             }
-
-        // SJRT preemptive: també ordenar abans de seleccionar
-            if (algorithm == SJF && modality == PREEMPTIVE && get_queue_size() > 0) {
+            
+            // Per PRIORITIES, ordenar la cua per prioritat abans de treure el procés
+            if (algorithm == PRIORITIES && get_queue_size() > 0) {
                 Process* list = transformQueueToList();
                 size_t queue_size = get_queue_size();
-                qsort(list, queue_size, sizeof(Process), compareBurst);
+                qsort(list, queue_size, sizeof(Process), comparePriority);
                 setQueueFromList(list);
                 free(list);
             }
@@ -139,31 +136,58 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
             quantum_counter = 0;
         }
 
-        // SJRT: Comprovar preempció cada cicle (FORA del bloc anterior)
-        if (algorithm == SJF && modality == PREEMPTIVE && current_process != NULL && 
-            !current_process->completed && get_queue_size() > 0) {
-            
-            int current_remaining = current_process->burst - getCurrentBurst(current_process, t);
+        // SJRT i PRIORITIES: Comprovar preempció cada cicle (només en mode preemptive)
+        if ((algorithm == SJF || algorithm == PRIORITIES) && modality == PREEMPTIVE && 
+            current_process != NULL && !current_process->completed && get_queue_size() > 0) {
             
             Process* list = transformQueueToList();
             size_t queue_size = get_queue_size();
             
+            int should_preempt = 0;
+            
+            // Buscar si hi ha un procés millor a la cua
             for (int i = 0; i < queue_size; i++) {
-                int queue_remaining = list[i].burst - getCurrentBurst(&list[i], t);
+                int preempt_condition = 0;
                 
-                if (queue_remaining < current_remaining) {
-                    enqueue(current_process);
-                    
-                    qsort(list, queue_size + 1, sizeof(Process), compareBurst);
-                    setQueueFromList(list);
-                    
-                    current_process = dequeue();
+                if (algorithm == SJF) {
+                    // SJRT: Comparar temps restant
+                    int current_remaining = current_process->burst - getCurrentBurst(current_process, t);
+                    int queue_remaining = list[i].burst - getCurrentBurst(&list[i], t);
+                    preempt_condition = (queue_remaining < current_remaining);
+                } else if (algorithm == PRIORITIES) {
+                    // PRIORITIES: Comparar prioritat (menor = més prioritat)
+                    preempt_condition = (list[i].priority < current_process->priority);
+                }
+                
+                if (preempt_condition) {
+                    should_preempt = 1;
                     break;
                 }
             }
             
-            free(list);
-
+            free(list);  // Alliberar abans de modificar la cua
+            
+            if (should_preempt) {
+                // Tornar el procés actual a la cua
+                enqueue(current_process);
+                
+                // Reconstruir la llista amb la nova mida
+                list = transformQueueToList();
+                queue_size = get_queue_size();
+                
+                // Ordenar segons l'algorisme
+                if (algorithm == SJF) {
+                    qsort(list, queue_size, sizeof(Process), compareBurst);
+                } else if (algorithm == PRIORITIES) {
+                    qsort(list, queue_size, sizeof(Process), comparePriority);
+                }
+                setQueueFromList(list);
+                
+                // Agafar el nou procés
+                current_process = dequeue();
+                
+                free(list);
+            }
         }
 
         // Executem el procés actual segons l'algoritme
