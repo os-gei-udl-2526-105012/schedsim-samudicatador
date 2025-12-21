@@ -69,82 +69,78 @@ int getCurrentBurst(Process* proc, int current_time){
 
 int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modality, int quantum){
 
-    //Process * _proclist;
-
-    qsort(procTable,nprocs,sizeof(Process),compareArrival);
+    qsort(procTable, nprocs, sizeof(Process), compareArrival); // nomes fcfs
 
     init_queue();
-    size_t duration = getTotalCPU(procTable, nprocs) +1;
+    size_t duration = getTotalCPU(procTable, nprocs) + 1;
 
-    for (int p=0; p<nprocs; p++ ){
-        procTable[p].lifecycle = malloc( duration * sizeof(int));
-        for(int t=0; t<duration; t++){
-            procTable[p].lifecycle[t]=-1;
-        }
+    for (int p = 0; p < nprocs; p++) {
+        procTable[p].lifecycle = malloc(duration * sizeof(int));
+        for (int t = 0; t < duration; t++)
+            procTable[p].lifecycle[t] = -1;
+
         procTable[p].waiting_time = 0;
         procTable[p].return_time = 0;
         procTable[p].response_time = 0;
         procTable[p].completed = false;
     }
-    int time = 0;
-    int completed = 0;
-    Process *current = NULL;
 
-    while (completed < nprocs) {
+    Process* current_process = NULL;
+
+    for (int t = 0; t < duration; t++) {
+
+        if (current_process == NULL || current_process->completed) {
+
+            Process* candidate = NULL;
+            for (int i = 0; i < nprocs; i++) {
+                if (!procTable[i].completed && procTable[i].arrive_time <= t) {
+                    if (!candidate) candidate = &procTable[i];
+                    else {
+                        if (algorithm == FCFS && procTable[i].arrive_time < candidate->arrive_time)
+                            candidate = &procTable[i];
+                        else if (algorithm == SJF && procTable[i].burst < candidate->burst)
+                            candidate = &procTable[i];
+                        else if (algorithm == PRIORITIES && procTable[i].priority < candidate->priority)
+                            candidate = &procTable[i];
+                    }
+                }
+            }
+            current_process = candidate;
+        }
+
+        // executa proces actual
+        if (current_process != NULL) {
+            current_process->lifecycle[t] = Running;
+            int burst_consumed = getCurrentBurst(current_process, t + 1);
+            if (burst_consumed == 1)
+                current_process->response_time = t - current_process->arrive_time;
+
+            if (burst_consumed >= current_process->burst) {
+                current_process->lifecycle[t + 1] = Finished;
+                current_process->completed = true;
+                current_process->return_time = t + 1 - current_process->arrive_time;
+                current_process = NULL; // per obligar a buscar nou proces al seguent cicle
+            }
+        }
 
         for (int p = 0; p < nprocs; p++) {
-            if (procTable[p].arrive_time == time) {
-                enqueue(&procTable[p]);
+            if (!procTable[p].completed && procTable[p].arrive_time <= t && &procTable[p] != current_process) {
+                procTable[p].lifecycle[t] = Bloqued;
+                procTable[p].waiting_time++;
             }
         }
-
-        if (current == NULL) {
-            current = dequeue();
-
-            if (current != NULL && current->response_time == 0) {
-                current->response_time = time - current->arrive_time;
-            }
-        }
-
-        for (int p = 0; p < nprocs; p++) {
-            if (&procTable[p] == current) {
-                procTable[p].lifecycle[time] = Running;
-            }
-            else if (procTable[p].completed) {
-                procTable[p].lifecycle[time] = Finished;
-            }
-            else if (procTable[p].arrive_time <= time) {
-                procTable[p].lifecycle[time] = Bloqued;
-            }
-            else {
-                procTable[p].lifecycle[time] = -1; 
-            }
-        }
-
-        if (current != NULL) {
-            int burstUsed = getCurrentBurst(current, time + 1);
-
-            if (burstUsed == current->burst) {
-                current->completed = true;
-                current->return_time = time - current->arrive_time + 1;
-                completed++;
-                current = NULL; 
-            }
-        }
-
-        time++;
     }
 
-    printSimulation(nprocs,procTable,duration);
+    printSimulation(nprocs, procTable, duration);
 
-    for (int p=0; p<nprocs; p++ ){
+    // Alliberem memòria
+    for (int p = 0; p < nprocs; p++)
         destroyProcess(procTable[p]);
-    }
 
     cleanQueue();
     return EXIT_SUCCESS;
-
 }
+
 
 
 void printSimulation(size_t nprocs, Process *procTable, size_t duration){
