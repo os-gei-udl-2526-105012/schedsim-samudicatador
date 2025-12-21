@@ -67,6 +67,11 @@ int getCurrentBurst(Process* proc, int current_time){
     return burst;
 }
 
+int getRemainingBurst(Process* proc, int current_time) {
+    int burst_consumed = getCurrentBurst(proc, current_time);
+    return proc->burst - burst_consumed;
+}
+
 int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modality, int quantum){
 
     Process * _proclist;
@@ -89,7 +94,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
   
     Process* current_process = NULL;
     int next_arrival = 0;
-
+    int quantum_counter = 0; 
  
     for (int t = 0; t < duration; t++) {
         
@@ -100,28 +105,88 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
         }
 
         // Si no hi ha procés executant-se, treiem un de la cua
-        if (current_process == NULL || current_process->completed) {
+        if (current_process == NULL || current_process->completed || 
+            (algorithm == RR && quantum_counter >= quantum)) {
+            
+            // Si el procés actual ha esgotat el quantum però no ha acabat, tornar-lo a la cua
+            if (current_process != NULL && !current_process->completed && 
+                algorithm == RR && quantum_counter >= quantum) {
+                enqueue(current_process);
+            }
+
+            // Per SJF (non-preemptive), ordenar la cua per burst abans de treure el procés
+            if (algorithm == SJF && modality == NONPREEMPTIVE && get_queue_size() > 0) {
+                Process* list = transformQueueToList();
+                size_t queue_size = get_queue_size();
+                
+                // Ordenar per burst (shortest first)
+                qsort(list, queue_size, sizeof(Process), compareBurst);
+                
+                setQueueFromList(list);
+                free(list);
+            }
+
+        // SJRT preemptive: també ordenar abans de seleccionar
+            if (algorithm == SJF && modality == PREEMPTIVE && get_queue_size() > 0) {
+                Process* list = transformQueueToList();
+                size_t queue_size = get_queue_size();
+                qsort(list, queue_size, sizeof(Process), compareBurst);
+                setQueueFromList(list);
+                free(list);
+            }
+
             current_process = dequeue();
+            quantum_counter = 0;
+        }
+
+        // SJRT: Comprovar preempció cada cicle (FORA del bloc anterior)
+        if (algorithm == SJF && modality == PREEMPTIVE && current_process != NULL && 
+            !current_process->completed && get_queue_size() > 0) {
+            
+            int current_remaining = current_process->burst - getCurrentBurst(current_process, t);
+            
+            Process* list = transformQueueToList();
+            size_t queue_size = get_queue_size();
+            
+            for (int i = 0; i < queue_size; i++) {
+                int queue_remaining = list[i].burst - getCurrentBurst(&list[i], t);
+                
+                if (queue_remaining < current_remaining) {
+                    enqueue(current_process);
+                    
+                    qsort(list, queue_size + 1, sizeof(Process), compareBurst);
+                    setQueueFromList(list);
+                    
+                    current_process = dequeue();
+                    break;
+                }
+            }
+            
+            free(list);
+
         }
 
         // Executem el procés actual segons l'algoritme
-        if (algorithm == FCFS) {
-            if (current_process != NULL) {
+        if (current_process != NULL) {
 
-                current_process->lifecycle[t] = Running;
-                
-                int burst_consumed = getCurrentBurst(current_process, t + 1);
-                
-                if (burst_consumed == 1) {
-                    current_process->response_time = t - current_process->arrive_time;
-                }
-                
-                // Si ha acabat el seu burst, marcar com completat
-                if (burst_consumed >= current_process->burst) {
-                    current_process->lifecycle[t+1] = Finished;
-                    current_process->completed = true;
-                    current_process->return_time = t + 1 - current_process->arrive_time;
-                }
+            current_process->lifecycle[t] = Running;
+
+            int burst_consumed = getCurrentBurst(current_process, t + 1);
+            
+            if (burst_consumed == 1) {
+                current_process->response_time = t - current_process->arrive_time;
+            }
+            
+            // Si ha acabat el seu burst, marcar com completat
+            if (burst_consumed >= current_process->burst) {
+                current_process->lifecycle[t+1] = Finished;
+                current_process->completed = true;
+                current_process->return_time = t + 1 - current_process->arrive_time;
+            }
+
+            // Incrementar quantum només per RR
+            if (algorithm == RR) {
+                quantum_counter++;
             }
         }
 
