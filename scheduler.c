@@ -143,15 +143,12 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
             
             int should_preempt = 0;
             
-            // Buscar si hi ha un procés millor a la cua
             for (int i = 0; i < queue_size; i++) {
                 int preempt_condition = 0;
                 
                 if (algorithm == SJF) {
                     // SJRT: Comparar temps restant
-                    int current_remaining = current_process->burst - getCurrentBurst(current_process, t);
-                    int queue_remaining = list[i].burst - getCurrentBurst(&list[i], t);
-                    preempt_condition = (queue_remaining < current_remaining);
+                    preempt_condition = (list[i].burst < current_process->burst);
                 } else if (algorithm == PRIORITIES) {
                     // PRIORITIES: Comparar prioritat (menor = més prioritat)
                     preempt_condition = (list[i].priority < current_process->priority);
@@ -163,17 +160,14 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
                 }
             }
             
-            free(list);  // Alliberar abans de modificar la cua
+            free(list);  
             
             if (should_preempt) {
-                // Tornar el procés actual a la cua
                 enqueue(current_process);
                 
-                // Reconstruir la llista amb la nova mida
                 list = transformQueueToList();
                 queue_size = get_queue_size();
                 
-                // Ordenar segons l'algorisme
                 if (algorithm == SJF) {
                     qsort(list, queue_size, sizeof(Process), compareBurst);
                 } else if (algorithm == PRIORITIES) {
@@ -181,14 +175,12 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
                 }
                 setQueueFromList(list);
                 
-                // Agafar el nou procés
                 current_process = dequeue();
                 
                 free(list);
             }
         }
 
-        // Executem el procés actual segons l'algoritme
         if (current_process != NULL) {
 
             current_process->lifecycle[t] = Running;
@@ -199,20 +191,17 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
                 current_process->response_time = t - current_process->arrive_time;
             }
             
-            // Si ha acabat el seu burst, marcar com completat
             if (burst_consumed >= current_process->burst) {
                 current_process->lifecycle[t+1] = Finished;
                 current_process->completed = true;
                 current_process->return_time = t + 1 - current_process->arrive_time;
             }
 
-            // Incrementar quantum només per RR
             if (algorithm == RR) {
                 quantum_counter++;
             }
         }
 
-        // Marquem els processos que estan esperant com Bloqued
         for (int p = 0; p < nprocs; p++) {
             if (procTable[p].arrive_time <= t && !procTable[p].completed && 
                 &procTable[p] != current_process) {
@@ -226,7 +215,6 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
     printSimulation(nprocs,procTable,duration);
 
 
-    //print metrix
 
     for (int p=0; p<nprocs; p++ ){
         destroyProcess(procTable[p]);
